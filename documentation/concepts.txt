@@ -1,0 +1,63 @@
+- Promt Engineering 
+
+    System prompt: A prompt given to the LLM or Chatbot that defines its overall behavior
+    user_prompt: A prompt given by the user as query (?)
+    Asisstant: Response of the LLM to the user 
+
+    3 techniques:
+        - Structured output
+        - Input structuring
+        - Chain of Thoughts
+
+---------------------------------
+
+- Retrieval Augmented Generation (RAG)
+    RAG helps models to output information that it doesn't have in its memory
+
+    Example: 
+    Cofeeshop bot doesn't know about the shop or the menu.
+    We need to inject this info in the prompt so that LLM can refer to it, get the output from it and respond accordingly 
+
+---------------------------------
+
+- Embedding: 
+    RAG helps in precise response but for that to work, most relevant data needs to be fed to the prompt. Embedding is used to do that. Embedding changes texts from words to numbers or array of numbers. This way texts can be compared and similarities and differences can be found using Mathematical operation. 
+
+---------------------------------
+
+- Recommendation Engine 
+
+    Market busket analysis:
+        A statistical model that tells which items are most popular in which order
+
+        Calculations:
+            - Support: How frequently an itemset appears in the dataset
+            - Confidence: How often item B is purchased when item A is purchased
+            - Lift: How much more likely B is to be bought with A than by chance
+
+        Two enigines created:
+            Popularity-based
+            Apriori
+        
+        [Will be very important for agentic AI]
+
+---------------------------------
+
+We can use Cloud for various need like LLM deployment, Embedding, Regular DB, Vector DB etc. 
+
+I am using:
+    Ollama for deploying language model locally [Phi-3]
+    Firebase (GCP) for data storage [products]
+    Sentence-Transformers for embedding data directly in Python [all-MiniLM-L6-v2]
+    Pinecone (AWS) for storing embedded data 
+
+---------------------------------
+
+Agents: 
+    Responses from LLM but specialized for various tasks
+    Increases accuracy by dividing tasks into smaller easier tasks to tackle
+
+    Guard: blocks/handles irrelevant questions
+    Input classifier: classifies user request into various categories (order, recommandation, details)
+    Order, Recommendation and Details agents (use Recommendation engine, VectorDB-based RAG etc.) 
+ 

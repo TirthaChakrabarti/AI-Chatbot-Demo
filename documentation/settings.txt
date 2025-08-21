@@ -1,0 +1,22 @@
+Installation command for libraries (requirement.txt): 
+
+In 'python_code' folder: 
+    pip install -r requirement.txt 
+    [can be done one by one]
+
+OR, in notebook (.ipynb):
+    !pip install *package name* [! implies terminal command]
+
+------------
+
+For Embedding: 
+
+installed 
+
+1) sentence-transformers
+On terminal: 
+    pip install sentence-transformers
+
+2) Sklearn
+On terminal:
+    pip install scikit-learn

@@ -1,4 +1,4 @@
-from openai import OpenAI
+import boto3
 import json
 import re
 from copy import deepcopy   # deepcopy copies by value and not by reference
@@ -10,11 +10,13 @@ dotenv.load_dotenv()
 
 class ClassificationAgent():
     def __init__(self):
-        self.client = OpenAI(
-            base_url="http://localhost:11434/v1",
-            api_key="ollama"  
+        self.client = boto3.client(
+            service_name='bedrock-runtime',
+            region_name='us-east-1'
         )
-        self.model_name = "phi3"
+
+        self.model_id = "meta.llama3-1-8b-instruct-v1:0"
+        self.model_inference_profile = 'arn:aws:bedrock:us-east-1:823413233438:inference-profile/us.meta.llama3-1-8b-instruct-v1:0'
 
     def get_response(self, messages):
         messages = deepcopy(messages)
@@ -70,7 +72,7 @@ class ClassificationAgent():
 
         print('input_messages(classification agent):', input_messages)
 
-        chatbot_output =get_chatbot_response(self.client,self.model_name,input_messages)
+        chatbot_output =get_chatbot_response(self.client,self.model_inference_profile,input_messages)
         print('chatbot_output(classification agent):', chatbot_output)
 
         output = self.postprocess(chatbot_output)

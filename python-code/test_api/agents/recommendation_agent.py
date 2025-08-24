@@ -1,4 +1,4 @@
-from openai import OpenAI
+import boto3
 import pandas as pd
 import json
 import re
@@ -11,11 +11,13 @@ dotenv.load_dotenv()
 
 class RecommendationAgent:
     def __init__(self, apriori_recommendation_path, popularity_recomendation_path):
-        self.client = OpenAI(
-            base_url="http://localhost:11434/v1",
-            api_key="ollama"  
+        self.client = boto3.client(
+            service_name='bedrock-runtime',
+            region_name='us-east-1'
         )
-        self.model_name = "phi3"
+
+        self.model_id = "meta.llama3-1-8b-instruct-v1:0"
+        self.model_inference_profile = 'arn:aws:bedrock:us-east-1:823413233438:inference-profile/us.meta.llama3-1-8b-instruct-v1:0'
 
         # loading JSON object of the apriori algorithm
         with open(apriori_recommendation_path, 'r') as json_file:
@@ -140,10 +142,10 @@ class RecommendationAgent:
         input_messages = [{"role": "system", "content": system_prompt}] + message
         # print('input messages (rec classification):', input_messages)
 
-        chatbot_response = get_chatbot_response(self.client,self.model_name,input_messages)
+        chatbot_response = get_chatbot_response(self.client,self.model_inference_profile,input_messages)
         print('chatbot response (rec classification):', chatbot_response)
 
-        chatbot_response = double_check_json_output(self.client,self.model_name,chatbot_response)
+        chatbot_response = double_check_json_output(self.client,self.model_inference_profile,chatbot_response)
         print('chatbot response after double check (rec classification):', chatbot_response)
 
         output = self.postprocess_classfication(chatbot_response)
@@ -228,7 +230,7 @@ class RecommendationAgent:
         messages[-1]['content'] = prompt
         input_messages = [{"role": "system", "content": system_prompt}] + messages[-3:]
 
-        chatbot_response = get_chatbot_response(self.client,self.model_name,input_messages)
+        chatbot_response = get_chatbot_response(self.client,self.model_inference_profile,input_messages)
         
         output = self.postprocess(chatbot_response)
 
@@ -283,7 +285,7 @@ class RecommendationAgent:
 
         print('input_messages (recommendation get_response):', input_messages)
 
-        chatbot_response = get_chatbot_response(self.client,self.model_name,input_messages)
+        chatbot_response = get_chatbot_response(self.client,self.model_inference_profile,input_messages)
         print('chatbot_response (recommendation):', chatbot_response)
 
         output = self.postprocess(chatbot_response)

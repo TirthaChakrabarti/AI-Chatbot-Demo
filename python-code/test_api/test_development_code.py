@@ -31,7 +31,7 @@ def main():
 
     while True:
         # clear previous inputs
-        os.system('cls' if os.name == 'nt' else 'clear')
+        # os.system('cls' if os.name == 'nt' else 'clear')
 
         print("\nStart Conversation.......")
         for message in messages:

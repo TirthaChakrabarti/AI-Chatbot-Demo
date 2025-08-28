@@ -1,287 +1,249 @@
 import boto3
-import os
-import json 
-from .utils import get_chatbot_response, double_check_json_output
+import json
+import uuid
 from copy import deepcopy
-from dotenv import load_dotenv
+from .utils import get_chatbot_response, double_check_json_output
+
 
 class OrderTakingAgent:
     def __init__(self, recommendation_agent):
         self.client = boto3.client(
-            service_name='bedrock-runtime',
-            region_name='us-east-1'
+            service_name="bedrock-runtime",
+            region_name="us-east-1"
         )
-
         self.model_id = "meta.llama3-1-8b-instruct-v1:0"
-        self.model_inference_profile = 'arn:aws:bedrock:us-east-1:823413233438:inference-profile/us.meta.llama3-1-8b-instruct-v1:0'
-
+        self.model_inference_profile = (
+            "arn:aws:bedrock:us-east-1:823413233438:inference-profile/us.meta.llama3-1-8b-instruct-v1:0"
+        )
         self.recommendation_agent = recommendation_agent
 
+    # ---------------------------
+    # Public Method
+    # ---------------------------
     def get_response(self, messages):
         messages = deepcopy(messages)
 
-        system_prompt = """
-            You are an Order taking agent for a coffee shop called "Merry's way".
+        # Get previous memory or default values
+        memory = self._extract_last_memory(messages)
+        order = memory.get("order", [])
+        step_number = memory.get("step_number", 1)
+        asked_recommendation_before = memory.get("asked_recommendation_before", False)
+        order_id = memory.get("order_id", str(uuid.uuid4()))
+        order_finalized = memory.get("order_finalized", False)
 
-            STRICT OUTPUT RULES:
-            - You MUST reply **only in valid JSON**.
-            - Any other output will crash the system.
-            - NEVER include conversational text outside the JSON object.
-            - If you need to ask questions, do it inside the "response" field.
+        user_message = messages[-1]["content"].lower()
 
-            Format (Follow exactly):
+        # ---------------------------
+        # Handle order status inquiry
+        # ---------------------------
+        if any(kw in user_message for kw in ["ordered?", "did you place", "what's my order", "my bill"]):
+            if order_finalized:
+                return self._generate_response(
+                    "✅ Your order has already been placed and finalized. Thank you! ☕",
+                    order, order_id, step_number, True
+                )
+            elif order:
+                order_summary = self._generate_order_summary(order)
+                return self._generate_response(
+                    f"So far, you have ordered:\n{order_summary}\n\nWould you like to add more or finalize?",
+                    order, order_id, step_number, False
+                )
+            else:
+                return self._generate_response(
+                    "You haven't ordered anything yet. Would you like to start?",
+                    order, order_id, step_number, False
+                )
 
-            {
-                "chain of thought": Short reasoning as a string
-                "step number": <number>
-                "order": 
-                    [{
-                        "item": "item name", 
-                        "quantity": <number>, 
-                        "price": "<item total price>" 
-                    }]
-                "response": "Ask about additional items or finalize the bill."
-            }
+        # ---------------------------
+        # Reset if previous order finalized and new one starts
+        # ---------------------------
+        if order_finalized and any(kw in user_message for kw in ["order", "want", "give me", "buy", "need"]):
+            order = []
+            step_number = 1
+            asked_recommendation_before = False
+            order_finalized = False
+            order_id = str(uuid.uuid4())
 
-            You're task is as follows:
-
-            1. Take the User's Order
-                IMPORTANT:
-                *STRICTLY catch the order item (even if small spelling mistake is present)
-                *STRICTLY catch the order quantity
-                *You MUST not make mistake in catching the items' names and quantities
-
-            2. Validate that all their items are in the menu. Here is the menu for this coffee shop.
-
-                Cappuccino - $4.50
-                Jumbo Savory Scone - $3.25
-                Latte - $4.75
-                Chocolate Chip Biscotti - $2.50
-                Espresso shot - $2.00
-                Hazelnut Biscotti - $2.75
-                Chocolate Croissant - $3.75
-                Dark chocolate (Drinking Chocolate) - $5.00
-                Cranberry Scone - $3.50
-                Croissant - $3.25
-                Almond Croissant - $4.00
-                Ginger Biscotti - $2.50
-                Oatmeal Scone - $3.25
-                Ginger Scone - $3.50
-                Chocolate syrup - $1.50
-                Hazelnut syrup - $1.50
-                Carmel syrup - $1.50
-                Sugar Free Vanilla syrup - $1.50
-                Dark chocolate (Packaged Chocolate) - $3.00
-
-            3. if an item is not in the menu let the user know (and repeat back the remaining valid order if any)
-            4. IMPORTANT: Ask them if they need anything else. 
-            5. If they do: repeat starting from step 3
-            6. If they don't want anything else: 
-                Using the "order" object that is in the output, 
-                *Make sure to hit all three points
-                1. List down all ordered items and their prices
-                2. SUPER CRITICAL: Calculate the total price without any mistake
-                3. Thank the user for the order and close the conversation with no more questions
-
-            The user message will contain a section called memory. This section will contain the following:
-            "order"
-            "step number"
-
-            please utilize this information to determine the next step in the process.
-
-            IMPORTANT: 
-            - DO NOT tell the user to go to the cash counter
-            - If the user adds a new item, APPEND it to the existing "order" array.
-            - If the user says "done", finalize the order and include the total.
-
-            CRITICAL: 
-            - No comments
-            - No trailing commas 
-            - No extra explanations
-            - ONLY output valid JSON
-            - The system parses your output with json.loads(). If you output anything else, it will crash.
-
-        """
-
-        last_order_taking_status = ""
-        asked_recommendation_before = False
-
-        for message_index in range(len(messages)-1, 0, -1):
-            message = messages[message_index]
-            
-            agent_name = message.get("memory", {}).get("agent", "")
-            print('agent name: ', agent_name)
-            if message.get("role") == "assistant" and agent_name == "order_taking_agent":
-                step_number = message['memory']['step number']
-                order = message['memory']['order']
-                asked_recommendation_before = message['memory']['asked_recommendation_before']
-
-                print('step number: ', step_number)
-                print('order: ', order)
-                print('asked recommendation before: ', asked_recommendation_before)
-
-                last_order_taking_status = f"""
-                step number: {step_number}
-                order: {order}
-                """
-
-                break
-
-        # messages[-1]['content'] = last_order_taking_status + "\n" + messages[-1]['content']
-
-        # input_messages = [{"role": "system", "content": system_prompt}] + messages[-3:]
-        input_messages = [{"role": "system", "content": system_prompt}]
-
-        # Add last memory if exists
-        if last_order_taking_status:
-            input_messages.append({
-                "role": "system",
-                "content": f"Previous state:\n{last_order_taking_status}"
-            })
-
-        # Add latest user message
-        input_messages.append(messages[-1])
-
-        print('input_messages (order taking): ', input_messages)
+        # ---------------------------
+        # Build prompt for LLM
+        # ---------------------------
+        system_prompt = self._build_system_prompt(order)
+        input_messages = [{"role": "system", "content": system_prompt}] + messages[-3:]
 
         chatbot_response = get_chatbot_response(self.client, self.model_inference_profile, input_messages)
-        print('chatbot_response (before double check): ', chatbot_response)
-        
         chatbot_response = double_check_json_output(self.client, self.model_inference_profile, chatbot_response)
-        print('chatbot_response (after double check): ', chatbot_response)
+        output_json = self._safe_json_load(chatbot_response)
 
-        output = self.postprocess(chatbot_response, messages, asked_recommendation_before)
-        print('processed output JSON (order taking): ', output)
-
-        return output
-    
-    def postprocess(self, output, messages, asked_recommendation_before):
-        # output = json.loads(output)
-        print('output (chatbot_response fed to postprocess from get_response): ', output)
-
-        output_json = self.safe_json_load(output)
-        print('output_json (in postprocess): ', output_json)
-
-        output_json = self.safe_json_load(output)
-
-        # Final fallback
+        # ---------------------------
+        # Fallback if JSON fails
+        # ---------------------------
         if not output_json:
-            print("Invalid JSON received. Skipping response.")
-            return {
-                "role": "assistant",
-                "content": "Sorry, I couldn't process that order. Could you repeat it?",
-                "memory": {
-                    "agent": "order_taking_agent",
-                    "step number": 1,
-                    "asked_recommendation_before": False,
-                    "order": []
-                }
+            return self._generate_response(
+                "⚠️ Sorry, I couldn't process your order. Could you please repeat?",
+                order, order_id, step_number, order_finalized
+            )
+
+        # ---------------------------
+        # Merge new items into order list
+        # ---------------------------
+
+        # From LLM output
+        llm_order_items = output_json.get("order", [])
+        if isinstance(llm_order_items, dict):
+            llm_order_items = [llm_order_items]
+
+        print("LLM order items:", llm_order_items)
+
+        # Convert to lowercase for safety
+        new_items = [
+            {
+                "item": item["item"].strip(),
+                "quantity": item.get("quantity", 1),
+                "price": item.get("price", 0)
             }
+            for item in llm_order_items
+        ]
 
-        # if type(output['order']) == str:
-        #     output['order'] = json.loads(output['order'])
+        print("New items:", new_items)
 
-        # Parse order
-        if isinstance(output_json.get("order"), str):
-            try:
-                output_json["order"] = json.loads(output_json["order"])
-            except json.JSONDecodeError:
-                output_json["order"] = []
+        for new_item in new_items:
+            found = False
+            for existing_item in order:
+                if existing_item["item"].lower() == new_item["item"].lower():
+                    print("Found existing item:", existing_item)
+                    print("New item:", new_item)
+                    # ✅ Overwrite price calculation
+                    existing_item["quantity"] = new_item["quantity"]
+                    existing_item["price"] = new_item["price"]
+                    # existing_item["price"] = existing_item["quantity"] * (new_item["price"] / new_item["quantity"])
+                    found = True
+                    break
+            if not found:
+                order.append(new_item)
+
+        memory["order"] = order
+
+        # ---------------------------
+        # Update memory
+        # ---------------------------
+        memory = {
+            "order": order,
+            "step_number": step_number,
+            "asked_recommendation_before": asked_recommendation_before,
+            "order_id": order_id,
+            "order_finalized": order_finalized
+        }
+        messages[-1]["memory"] = memory
 
 
-        # response = output['response']
-        response = output_json.get("response", "").strip()
-        order_list = output_json.get("order", [])
+        # ---------------------------
+        # If user finalizes the order
+        # ---------------------------
+        if any(kw in user_message for kw in ["done", "checkout", "finalize", "that's all", "no more", "nothing else"]):
+            total_price = self._calculate_total(order)
+            order_finalized = True
+            summary = self._generate_order_summary(order, total_price)
+            return self._generate_response(
+                f"🧾 Here's your order summary:\n{summary}\n\nTotal: ${total_price:.2f}\n\nThank you for ordering from Merry's Way! ☕",
+                order, order_id, step_number + 1, order_finalized
+            )
 
-        print("In postprocess:")
-        print('response: ', response)
-        print('order list: ', order_list)
-
-        # if not asked_recommendation_before and len(output['order']) > 0:
-        #     recommendation_output = self.recommendation_agent.get_recommendations_from_order(messages, output['order'])
-        #     response = recommendation_output['content']
-        #     asked_recommendation_before = True
-
-        # dict_output = {
-        #     "role": "assistant",
-        #     "content": response,
-        #     "memory": {
-        #         "agent": "order_taking_agent",
-        #         "step number": output.get("step number", 1),
-        #         "asked recommendation before": asked_recommendation_before,
-        #         "order": output['order']
-        #     }
-        # }
-
-        # return dict_output
-
-         # Only fetch recommendations if:
-        # - We haven’t already asked before
-        # - There is at least one valid item
-
-        if not asked_recommendation_before and order_list:
-            rec_output = self.recommendation_agent.get_recommendations_from_order(messages, order_list)
-            print('rec_output: ', rec_output)
-
+        # ---------------------------
+        # Smart Recommendations (Apriori)
+        # ---------------------------
+        if not asked_recommendation_before and new_items:
+            rec_output = self.recommendation_agent.get_recommendations_from_order(messages, order)
+            response = output_json.get("response", "").strip()
             if isinstance(rec_output, dict) and "content" in rec_output:
                 rec_text = rec_output["content"].strip()
-                print('rec_text: ', rec_text)
-
-                # Simple sanity check to avoid "apocalypse" repeats
-                if rec_text and len(rec_text.split()) > 3 and rec_text.lower() != response.lower():
-                    response += "\n\n" + rec_text
+                if rec_text:
+                    response += f"\n\n{rec_text}"
                     asked_recommendation_before = True
+        else:
+            response = output_json.get("response", "").strip()
 
+        return self._generate_response(
+            response, order, order_id, step_number + 1, order_finalized, asked_recommendation_before
+        )
+
+    # ---------------------------
+    # Helper Functions
+    # ---------------------------
+    def _extract_last_memory(self, messages):
+        """Get last state from memory if exists."""
+        for msg in reversed(messages):
+            mem = msg.get("memory", {})
+            if mem.get("agent") == "order_taking_agent":
+                return mem
+        return {}
+
+    def _build_system_prompt(self, order):
+        return f"""
+        You are an Order Taking Agent for Merry's Way Coffee Shop.
+        Always respond in valid JSON only, no extra text.
+
+        Format:
+        {{
+            "step_number": <number>,
+            "order": [{{"item": "Latte", "quantity": 2, "price": 9.5}}],
+            "response": "Ask for additional items or finalize."
+        }}
+
+        Menu:
+        Cappuccino - $4.50
+        Jumbo Savory Scone - $3.25
+        Latte - $4.75
+        Chocolate Chip Biscotti - $2.50
+        Espresso shot - $2.00
+        Hazelnut Biscotti - $2.75
+        Chocolate Croissant - $3.75
+        Dark chocolate (Drinking Chocolate) - $5.00
+        Cranberry Scone - $3.50
+        Croissant - $3.25
+        Almond Croissant - $4.00
+        Ginger Biscotti - $2.50
+        Oatmeal Scone - $3.25
+        Ginger Scone - $3.50
+        Chocolate syrup - $1.50
+        Hazelnut syrup - $1.50
+        Carmel syrup - $1.50
+        Sugar Free Vanilla syrup - $1.50
+        Dark chocolate (Packaged Chocolate) - $3.00
+
+        Previous Order: {json.dumps(order, ensure_ascii=False)}
+        """
+
+    def _calculate_total(self, order):
+        total = sum((item["price"] * item["quantity"]) for item in order)
+        return total
+
+    def _generate_order_summary(self, order, total=None):
+        summary = "\n".join([f"- {item['quantity']} x {item['item']} = ${item['quantity'] * float(item['price']):.2f}" for item in order])
+        if total is not None:
+            summary += f"\n\nTotal = ${total:.2f}"
+        return summary
+
+    def _generate_response(self, response, order, order_id, step_number, finalized=False, asked_recommendation_before=False):
         return {
             "role": "assistant",
             "content": response,
             "memory": {
                 "agent": "order_taking_agent",
-                "step number": output_json.get("step number", 1),
-                "asked_recommendation_before": asked_recommendation_before,
-                "order": order_list
+                "step_number": step_number,
+                "order": order,
+                "order_id": order_id,
+                "order_finalized": finalized,
+                "asked_recommendation_before": asked_recommendation_before
             }
         }
-    
-    def safe_json_load(self, output: str):
-        """Extract the first valid JSON object from a string."""
 
-        print("output (fed to safe_json_load from postprocess):", output)
-
-        json_obj = None
-        brace_count = 0
-        start_idx = None
-        for i, ch in enumerate(output):
-            if ch == '{':
-                if brace_count == 0:
-                    start_idx = i
-                brace_count += 1
-            elif ch == '}':
-                brace_count -= 1
-                if brace_count == 0 and start_idx is not None:
-                    try:
-                        json_obj = json.loads(output[start_idx:i+1])
-                        print("json_obj (in safe_json_load):", json_obj)
-                        return json_obj
-                    except json.JSONDecodeError:
-                        continue
-        # return None
-
-        # Final fallback: ask model to repair JSON
-        repaired = get_chatbot_response(
-            self.client,
-            self.model_inference_profile,
-            [
-                {
-                    "role": "system",
-                    "content": "Return ONLY valid JSON. Nothing else."
-                },
-                {"role": "user", "content": output}
-            ]
-        )
-        
+    def _safe_json_load(self, output: str):
         try:
-            return json.loads(repaired)
-        except json.JSONDecodeError:
-            print("safe_json_load: Model failed to repair JSON")
-            return None
+            return json.loads(output)
+        except:
+            try:
+                start_idx = output.find("{")
+                end_idx = output.rfind("}")
+                return json.loads(output[start_idx:end_idx + 1])
+            except:
+                return None

@@ -1,0 +1,110 @@
+!pip install sagemaker -U
+
+import sagemaker
+import boto3
+
+sess = sagemaker.Session()
+
+# Sagemaker session bucket -> used for uploading data, models and logs
+# Sagemaker will automatically create this bucket if automatically doesn't exist
+
+sagemaker_session_bucket = None
+if sagemaker_session_bucket is None and sess is not None:
+    sagemaker_session_bucket = sess.default_bucket()
+
+# Role management 
+try:
+    role = sagemaker.get_execution_role()
+except ValueError:
+    iam = boto3.client("iam")
+    role = iam.get_role(RoleName='sagemaker_execution_role')['Role']['Arn']
+
+session = sagemaker.Session(default_bucket=sagemaker_session_bucket)
+
+print(f"sagemaker role arn: {role}")
+print(f"sagemaker session region: {sess.boto_region_name}")
+
+from sagemaker.huggingface import HuggingFaceModel
+
+# Hub Model configuration. https://huggingface.co/models
+hub = {
+  'HF_MODEL_ID':'distilbert-base-uncased-distilled-squad', # model_id from hf.co/models
+  'HF_TASK':'question-answering' # NLP task you want to use for predictions
+}
+
+# create Hugging Face Model Class
+huggingface_model = HuggingFaceModel(
+   env=hub,
+   role=role, # iam role with permissions to create an Endpoint
+   transformers_version="4.26", # transformers version used
+   pytorch_version="1.13", # pytorch version used
+   py_version="py39", # python version of the DLC
+)
+
+# deploy model to SageMaker Inference
+predictor = huggingface_model.deploy(
+   initial_instance_count=1,
+   instance_type="ml.m5.xlarge"
+)
+
+# example request, you always need to define "inputs"
+data = {
+"inputs": {
+    "question": "What is used for inference?",
+    "context": "My Name is Tirtha and I live in India. This model is used with sagemaker for inference."
+    }
+}
+
+# request
+predictor.predict(data)
+
+data = {
+"inputs": {
+    "question": "What does Tirtha like?",
+    "context": "My Name is Tirtha. I studied Civil Engineering and Physics. I work at IT industry as a Web and Mobile application Developer and learning AI engineering. I write poem, articles and novel- especially on Science, Philosophy, Science Fiction and Futurism"
+    }
+}
+
+# request
+predictor.predict(data)
+
+-------------------------------------------------
+-------------------------------------------------
+
+import sagemaker
+from sagemaker.huggingface import HuggingFaceModel
+
+role = "arn:aws:iam::823413233438:role/service-role/AmazonSageMaker-ExecutionRole-20250825T174963"
+sess = sagemaker.Session()
+
+# Example for Phi-3 on Hugging Face Hub
+hub = {
+    "HF_MODEL_ID": "microsoft/phi-3-mini-4k-instruct",
+    "HF_TASK": "text-generation"
+}
+
+huggingface_model = HuggingFaceModel(
+    role=role,
+    transformers_version="4.49.0",  # Check HF docs for latest
+    pytorch_version="2.6.0",
+    py_version="py312",
+    env=hub
+)
+
+predictor = huggingface_model.deploy(
+    initial_instance_count=1,
+    instance_type="ml.g5.2xlarge"  # Choose based on model size
+)
+
+# prompt = "Explain quantum computing in simple terms."
+prompt = "What is the capital of India?"
+
+response = predictor.predict({
+    "inputs": prompt,
+    "parameters": {
+        "temperature": 0.7,
+        "max_new_tokens": 200
+    }
+})
+
+print(response)

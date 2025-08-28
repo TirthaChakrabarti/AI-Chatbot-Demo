@@ -43,7 +43,7 @@ class GuardAgent():
         5. Ordering items (want to order, buy, need, give, provide, send etc.)
         6. Asking for recommendations or suggestions on what to buy (if item or category not specified, assume it's about recommendations from our menu)
         7. Asking about the AI assistant's purpose, what it can do, and how it helps in the coffee shop.
-        8. Greetings, thakings, farewells etc. -- even without anything specific to the coffee shop — unless they clearly mention an unrelated topic.
+        8. Greetings, thankings, farewells etc. -- even without anything specific to the coffee shop — unless they clearly mention an unrelated topic.
 
         NOT ALLOWED if the message is:
 

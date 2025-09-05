@@ -46,12 +46,12 @@ class RecommendationAgent:
                 print('ordered product one:', product)
 
                 recommendation_list += self.apriori_recommendations[product]
-                print('apriori recommendations list:', self.apriori_recommendations[product])
-                print('recommendation list:', recommendation_list)
+                # print('apriori recommendations list:', self.apriori_recommendations[product])
+                # print('recommendation list:', recommendation_list)
 
         # Sort recommendation list based on "confidence" in descending order
         recommendation_list = sorted(recommendation_list, key=lambda x: x['confidence'], reverse=True)
-        print('sorted recommendation list:', recommendation_list)
+        # print('sorted recommendation list:', recommendation_list)
 
         recommendations = []
         recommendations_per_category = {}

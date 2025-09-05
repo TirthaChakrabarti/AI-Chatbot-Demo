@@ -27,9 +27,12 @@ class ClassificationAgent():
 
         **We have 3 agents to choose from:
 
-        1. details_agent: for answering questions about the coffee shop, its location, delivery places, working hours, menu items (that we have or serve) and their details, prices. And also to answer greetings and goodbyes.
-        2. order_taking_agent: for taking ORDERS from the user or finalize the bill. It's responsible to have a conversation with the user about the order untill it's complete.
-        3. recommendation_agent: for giving recommendations and suggestions to the user about what to buy. If the user asks for a recommendation or suggestion, this agent should be used.
+        1. details_agent: for answering questions about the coffee shop, its location, delivery places, working hours, menu items (that we have or serve) and their details, prices. And also to answer greetings and goodbyes. 
+        CRITICAL: If user seems to be ordering but specific item is unclear (just saying "order something", "order coffee" etc.), details_agent must be used, not order_taking_agent.
+
+        2. order_taking_agent: for taking ORDERS from the user (only if specific item is clear) or finalize the bill. It's responsible to have a conversation with the user about the order untill it's complete.
+
+        3. recommendation_agent: for giving recommendations and suggestions to the user about what to buy. If the user asks for a recommendation or suggestion, this agent should be used. 
         
         OUTPUT RULES:
         - Always output ONLY valid JSON (no extra text).
@@ -45,6 +48,7 @@ class ClassificationAgent():
         If the user's message is unclear, use DECISION HELPER:
 
         1. If the user is ASKING a question (ends with "?" or starts with "do you", "can you", "what", "where", "when", "how", "is", "are") or wanting to know (statements like "tell me", "tell me about", "tell me more about", "give me details", "give me more details", "explain", "explain more", "what's the difference between"), chose "details_agent".
+        -SPECIAL CASE: If user seems to be ordering but specific item is unclear (just saying "order something", "buy me a coffee" etc.), choose "recommendation_agent".
 
         2. If the user is REQUESTING or ORDERING something (statements like "order", "I want", "I'll have", "get me", "give me", "send me", "please bring", "buy", "need" or just the name of product), chose "order_taking_agent". 
         -SPECIAL CASE: If the user says phrases like "no", "no thanks", "nope", "nothing else", "that's all", "done", "finalize", or "checkout" after ordering, ALWAYS choose "order_taking_agent" because it needs to finalize the bill.
@@ -63,17 +67,17 @@ class ClassificationAgent():
             {"role": "system", "content": system_prompt},
         ]
 
-        # input_messages += messages[-3:]
+        input_messages += messages[-5:]
         # Only pass the last user message, not assistant messages
-        if messages and messages[-1]['role'] == 'user':
-            input_messages.append(messages[-1])
+        # if messages and messages[-1]['role'] == 'user':
+        #     input_messages.append(messages[-1])
 
         input_messages.insert(0, {"role": "system", "content": 'CRITICAL: Your response will be parsed by json.loads(). If it is not valid JSON, the program will crash.'})
 
-        print('input_messages(classification agent):', input_messages)
+        # print('input_messages(classification agent):', input_messages)
 
         chatbot_output =get_chatbot_response(self.client,self.model_inference_profile,input_messages)
-        print('chatbot_output(classification agent):', chatbot_output)
+        # print('chatbot_output(classification agent):', chatbot_output)
 
         output = self.postprocess(chatbot_output)
         print('processed output(classification agent):', output)

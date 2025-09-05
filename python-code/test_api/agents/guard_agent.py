@@ -27,10 +27,12 @@ class GuardAgent():
 
         You MUST generate a JSON of this structure exactly:
         {
-        "Reason": "Brief reasoning showing which rule matched.",
+        "chain_of_thought": "Brief reasoning showing which rule is applied",
         "decision": "allowed" or "not allowed",
         "message": "" if allowed, otherwise "Sorry, being a Coffee Shop AI, I am unable to proceed with that request. Kindly ensure it's about the coffee shop and its services. Thank you."
         }
+
+       **DO NOT include markdown fences like ```json or ``` around the response. 
 
         RULES:
 
@@ -51,6 +53,7 @@ class GuardAgent():
         2. About coffeeshop's employees 
         3. About how to make an item (recipes, preparation steps)
         4. Asking recommendation for unrelated items
+        5. STRICTLY not allowed: pornography, sexuality, violence, hatred, racism, alcoholic drinks, drugs etc.
 
         IMPORTANT:
         - Do not try to answer questions. 
@@ -63,7 +66,7 @@ class GuardAgent():
         - Decision rules must be applied strictly.
         """
 
-        input_messages = [{"role": "system", "content": system_prompt}] + message[-3:]
+        input_messages = [{"role": "system", "content": system_prompt}] + message[-8:]
 
         # for message in message:
         #     input_messages.append({"role": message["role"], "content": message["content"]})
@@ -89,7 +92,7 @@ class GuardAgent():
             
             input_messages = [{"role": "system", "content": system_prompt_with_retry}]
 
-            print("Input Messages (Guard):", input_messages)
+            # print("Input Messages (Guard):", input_messages)
 
             chatbot_output = get_chatbot_response(self.client, self.model_inference_profile, input_messages)
             print("Chatbot output (Guard):", chatbot_output)

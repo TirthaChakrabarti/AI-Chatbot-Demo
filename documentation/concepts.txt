@@ -47,6 +47,7 @@ We can use Cloud for various need like LLM deployment, Embedding, Regular DB, Ve
 
 I am using:
     Ollama for deploying language model locally [Phi-3]
+    (Now using AWS Bedrock)
     Firebase (GCP) for data storage [products]
     Sentence-Transformers for embedding data directly in Python [all-MiniLM-L6-v2]
     Pinecone (AWS) for storing embedded data 

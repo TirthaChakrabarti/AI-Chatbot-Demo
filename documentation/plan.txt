@@ -3,6 +3,8 @@
 - Ensure it doesn't accept price negotiation requested by user (w)
 - Apriori recommendation malfunctioning (w)
 
+- "ok", "no" etc. aren't handled properly
+
 - Ensure Order finalization means it can't be changed anymore [or controlled limited no. of times] (ask)
 - Add a greetings agent (entire details not needed for greetings)
 - Add prices for recommendation list (is fetching knowledge from multiple sources together possible?)

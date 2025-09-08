@@ -1,0 +1,2 @@
+In Popularity Recommendation file, I have manually changed Chocolate names 
+Called both 'Dark Chocolate' and mentioned speciality in bracket

@@ -1,0 +1,12 @@
+- Complex multi-intent ordering (w-ci)
+- Handle query when order book is blank (w)
+- Ensure it doesn't accept price negotiation requested by user (w)
+- Apriori recommendation malfunctioning (w)
+
+- Ensure Order finalization means it can't be changed anymore [or controlled limited no. of times] (ask)
+- Add a greetings agent (entire details not needed for greetings)
+- Add prices for recommendation list (is fetching knowledge from multiple sources together possible?)
+- Add delivery time to its knowledge (for production, should be dynamic)
+- Add a "today's special' to its knowledge (for production, should be dynamic)
+- Add an intent classifier and multi-question query splitter before Recommendation agent 
+- Fix Guard agent

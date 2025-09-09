@@ -45,15 +45,20 @@ class ClassificationAgent():
 
         - Keys and values must be strings.
 
-        If the user's message is unclear, use DECISION HELPER:
+        If the user's message is unclear, use following DECISION HELPER:
 
         1. If the user is ASKING a question (ends with "?" or starts with "do you", "can you", "what", "where", "when", "how", "is", "are") or wanting to know (statements like "tell me", "tell me about", "tell me more about", "give me details", "give me more details", "explain", "explain more", "what's the difference between"), chose "details_agent".
-        -SPECIAL CASE: If user seems to be ordering but specific item is unclear (just saying "order something", "buy me a coffee" etc.), choose "recommendation_agent".
 
         2. If the user is REQUESTING or ORDERING something (statements like "order", "I want", "I'll have", "get me", "give me", "send me", "please bring", "buy", "need" or just the name of product), chose "order_taking_agent". 
-        -SPECIAL CASE: If the user says phrases like "no", "no thanks", "nope", "nothing else", "that's all", "done", "finalize", or "checkout" after ordering, ALWAYS choose "order_taking_agent" because it needs to finalize the bill.
+
+        # SPECIAL CASE: 
+        - If the user says phrases like "no", "no thanks", "nope", "nothing else", "that's all", "done", "finalize", or "checkout" AFTER ORDERING (i.e. ordering already started), ALWAYS choose "order_taking_agent" because it needs to finalize the bill.
+        - If there is no active order or no items have been added, route to "details_agent" instead.
 
         3. If the user is ASKING for a suggestion or recommendation ("what do you recommend", "any specials", "suggest me something"), chose "recommendation_agent".
+
+        # SPECIAL CASE: 
+        - If user seems to be ordering but specific item is unclear (just saying "order something", "buy me a coffee" etc.), choose "recommendation_agent".
 
         4. Greetings or goodbyes ("hi", "hello", "bye", "thanks") chose "details_agent".
 
@@ -67,7 +72,8 @@ class ClassificationAgent():
             {"role": "system", "content": system_prompt},
         ]
 
-        input_messages += messages[-5:]
+        input_messages += messages[-8:]
+
         # Only pass the last user message, not assistant messages
         # if messages and messages[-1]['role'] == 'user':
         #     input_messages.append(messages[-1])
@@ -77,7 +83,7 @@ class ClassificationAgent():
         # print('input_messages(classification agent):', input_messages)
 
         chatbot_output =get_chatbot_response(self.client,self.model_inference_profile,input_messages)
-        # print('chatbot_output(classification agent):', chatbot_output)
+        print('chatbot_output(classification agent):', chatbot_output)
 
         output = self.postprocess(chatbot_output)
         print('processed output(classification agent):', output)

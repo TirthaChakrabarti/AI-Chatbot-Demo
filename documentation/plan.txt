@@ -3,7 +3,10 @@
 - Ensure it doesn't accept price negotiation requested by user (w)
 - Apriori recommendation malfunctioning (w)
 
-- "ok", "no" etc. aren't handled properly
+- Fix Guard agent (wip)
+- apriori Recommendation 
+
+- "ok", "no" etc. aren't handled properly (always thinks it's about order)
 
 - Ensure Order finalization means it can't be changed anymore [or controlled limited no. of times] (ask)
 - Add a greetings agent (entire details not needed for greetings)
@@ -11,4 +14,5 @@
 - Add delivery time to its knowledge (for production, should be dynamic)
 - Add a "today's special' to its knowledge (for production, should be dynamic)
 - Add an intent classifier and multi-question query splitter before Recommendation agent 
-- Fix Guard agent
+
+
